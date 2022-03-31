@@ -1,0 +1,376 @@
+-- DISTINCT - получить выборку уникальных значений
+SELECT DISTINCT *
+FROM nametable 
+
+-- COUNT - получить уникальное кол-во стран, где живут работники
+SELECT COUNT(DISTINCT country)
+FROM employees
+
+-- WHERE - фильтрация данных
+SELECT columns
+FROM employees
+WHERE employee_id
+
+-- AND - объединение условий фильтрации
+SELECT columns
+FROM employee
+WHERE first_name = 'Ivan' AND age > 20
+
+-- OR - объединение условий из одного столбца
+SELECT columns
+FROM employee
+WHERE country = 'USA' OE country = 'UK'
+
+-- AND и OR вместе
+SELECT *
+FROM orders
+WHERE shipped_date > '1998-04-30' AND (freight < 75 OR freight > 150);
+
+-- AND
+SELECT *
+FROM orders
+WHERE freight >= 75 AND freight <= 150;
+
+-- BETWEEN - интервал с включением границ
+SELECT *
+FROM orders
+WHERE freight BETWEEN 75 AND 150;
+
+-- IN
+SELECT *
+FROM customers
+WHERE country = 'Mexico' OR country = 'Germany' OR country = 'USA' OR country = 'Canada';
+
+Аналогично
+
+SELECT *
+FROM customers
+WHERE country IN ('Mexico', 'Germany', 'USA', 'Canada');
+
+-- NOT IN - исключить указанные элементы
+SELECT *
+FROM customers
+WHERE country NOT IN ('Mexico', 'Germany', 'USA', 'Canada');
+
+-- ORDER BY - сортировка
+SELECT country
+FROM customers
+ORDER BY country
+
+-- DESC - Сортировка в обратном порядке
+SELECT country
+FROM customers
+ORDER BY country DESC
+
+SELECT country, city
+FROM customers
+ORDER BY country DESC, city DESC
+
+-- MIN - получение минимального значения
+SELECT MIN(order_date)
+FROM orders
+WHERE ship_city = 'London'
+
+-- MAX - получение максимального значения
+SELECT MAX(order_date)
+FROM orders
+WHERE ship_city = 'London'
+
+-- AVG - получение среднего значения
+SELECT AVG(unit_price)
+FROM products
+WHERE discontinued != 1
+
+-- SUM - узнать сумму чего-то
+SELECT SUM(units_in_stock)
+FROM products
+WHERE discontinued <> 1
+
+-- LIKE - применить шаблон, где % - это любое кол-во символов, а _ - это любой один символ
+SELECT last_name, first_name
+FROM employees
+WHERE first_name LIKE '%n'
+
+-- LIMIT - возвращает количество первых записей, ставится в конце всего запроса
+SELECT last_name, first_name
+FROM employees
+LIMIT 4
+
+-- NULL - вывод записей, которые NULL
+SELECT ship_city, ship_region, ship_country
+FROM orders 
+WHERE ship_region IS NULL
+
+-- NOT NULL - вывод записей, которые не NULL
+SELECT ship_city, ship_region, ship_country
+FROM orders 
+WHERE ship_region IS NOT NULL
+
+-- GROUP BY - Группировка, распологается между WHERE и ORDER BY
+посчитаем кол-во заказов вес которыех > 50 кг, сгруппировав по странам доставки
+SELECT ship_country, COUNT(ship_country)
+FROM orders 
+WHERE freight > 50
+GROUP BY ship_country
+ORDER BY COUNT(ship_country) DESC
+
+SELECT category_id, SUM(units_in_stock)
+FROM products
+GROUP BY category_id
+ORDER BY SUM(units_in_stock) DESC
+LIMIT 5
+
+-- HAVING - Постфильтрация используется после того как уже наложили GROUP BY и ORDER BY
+-- Аналог WHERE, но WHERE это первичный фильтр, а HAVING - вторичный фильтр
+SELECT category_id, SUM(unit_price * units_in_stock) AS all_sum
+FROM products
+WHERE discontinued <> 1
+GROUP BY category_id
+HAVING SUM(unit_price * units_in_stock) > 5000
+ORDER BY all_sum DESC
+
+-- UNION - объединение результатов двух SELECT без вывода дупликатов
+SELECT country
+FROM customers
+UNION
+SELECT country
+FROM employees
+
+-- INTERSECT - пересечение результатов двух SELECT
+SELECT country
+FROM customers
+INTERSECT 
+SELECT country
+FROM suppliers
+
+-- EXCEPT - Исключение результатов двух SELECT, т.е. Из табличкИ customers получим те страны, которых нет в suppliers
+SELECT country
+FROM customers
+EXCEPT 
+SELECT country
+FROM suppliers
+
+-- JOIN (INNER JOIN) - Соединение двух таблиц по совпадающим ключам
+SELECT product_name, 
+	   company_name, 
+	   units_in_stock
+FROM products
+JOIN suppliers ON products.supplier_id = suppliers.supplier_id
+ORDER BY units_in_stock DESC
+
+SELECT category_name, SUM(units_in_stock)
+FROM products
+JOIN categories ON products.category_id = categories.category_id
+GROUP BY category_name
+ORDER BY SUM(units_in_stock) DESC
+
+-- LEFT JOIN - Соединение двух таблиц с выводом всех данных из левой таблицы
+SELECT company_name, order_id
+FROM customers
+RIGHT JOIN orders ON customers.customer_id = orders.customer_id
+WHERE order_id IS NULL;
+
+-- USING - позволяет сократить запись соединения таблиц по столбцам через ON
+SELECT category_name, SUM(units_in_stock)
+FROM products
+JOIN categories USING(category_id)
+GROUP BY category_name
+ORDER BY SUM(units_in_stock) DESC
+
+-- NATURAL JOIN - то же самое что INNER JOIN, а само соединение происходит по всем столбцам
+-- которые проименованы одинаково (есть проблема нечитабельности кода)
+SELECT order_id, customer_id, first_name, last_name, title
+FROM orders
+NATURAL JOIN employees;
+
+-- Подзапрос IN - после IN в скобках можно записать запрос
+SELECT company_name
+FROM suppliers
+WHERE country IN (SELECT DISTINCT country
+                  FROM customers)
+                  
+-- Подзапрос LIMIT
+SELECT category_name, SUM(units_in_stock)
+FROM products
+JOIN categories Using(category_id)
+GROUP BY category_name
+ORDER BY SUM(units_in_stock) DESC
+LIMIT (SELECT MIN(product_id) + 4 FROM products)
+
+-- WHERE EXISTS - содержит подзапрос, возвращает true, если была возвращена 1 строка или более
+SELECT company_name, contact_name
+FROM customers
+WHERE EXISTS(SELECT customer_id FROM orders
+			WHERE customer_id = customers.customer_id
+			AND freight BETWEEN 50 AND 100);
+			
+SELECT company_name, contact_name
+FROM customers
+WHERE NOT EXISTS(SELECT customer_id FROM orders
+			WHERE customer_id = customers.customer_id
+			AND order_date BETWEEN '1995-02-01' AND '1995-02-15')
+			
+-- ANY - содержит подзапрос который должен совпадать с столбцом перед знаком равно 
+SELECT DISTINCT company_name
+FROM customers
+WHERE customer_id = ANY(SELECT customer_id FROM orders
+					   JOIN order_details USING(order_id)
+					   WHERE quantity > 40)
+ORDER BY company_name;
+
+-- ALL - Содержит подзапрос, значение из котрого учитывает все эти значения сразу
+SELECT DISTINCT product_name, quantity
+FROM products
+JOIN order_details USING(product_id)
+WHERE quantity > ALL(SELECT AVG(quantity)
+                     FROM order_details
+                     GROUP BY product_id)
+ORDER BY product_name
+
+-- DDL - Data Definition Language Часть SQL, котораяпозволяет манипулировать данными
+  -- CREATE TABLE table_name
+  -- ALTER TABLE table_name - изменить таблицу
+    -- ADD COLUMN column_name DATA_TYPE - добавить столбец
+    -- RENAME TO new_table_name - переименовать таблицу
+    -- RENAME old_column_name TO new_column_name - переименовать столбец
+    -- ALTER COLUMN column_name SET DATA TYPE data_type - задать новый тип данных
+    -- DROP CONSTRAINT constraint_name - удалить ограничение из таблицы
+    -- ADD CONSTRAINT constraint_name - добавить ограничение для таблицы
+    -- ADD PRIMARY KEY(column_name) - добавить ограничение PRIMARY KEY для столбца таблицы
+  -- DROP TABLE table_name - удаляет всю таблицу
+  -- TRUNCATE TABLE table_name - удаляет все данные таблицы (но не сможет удалить данные, на которые есть ссылки из других таблиц)
+  -- DROP COLUMN column_name - удалить столбец
+  -- INSERT INTO table_name - вставить в таблицу данные
+  
+  -- PRIMARY KEY - Ограничение первичный ключ, используется для колонки идентификатора и делает значения уникальными, запрещает вставлять NULL (т.к. автоматом выставляет ограничение NOT NULL)
+  CREATE TABLE chair
+  (
+	chair_id serial PRIMARY KEY,
+	chair_name varchar,
+	dean varchar
+  );
+  
+  -- UNIQUE - Ограничение уникальности, связка UNIQUE NOT NULL схожа с PRIMARY KEY, однако UNIQUE можно использовать несколько раз, а PRIMARY KEY только к одному столбцу. 
+  CREATE TABLE chair
+  (
+	chair_id serial UNIQUE NOT NULL,
+	chair_name varchar,
+	dean varchar
+  );
+
+  -- CONSTRAINT - используется для описания ограничения
+  CONSTRAINT pk_chair_chair_id PRIMARY KEY(chair_id)
+  
+  -- FOREIGN KEY - ограничение внешний ключ, используется для ссылки на колонку из другой таблицы
+  ALTER TABLE BOOK
+  ADD CONSTRAINT FK_books_publisher FOREIGN KEY(publisher_id) REFERENCES publisher(publisher_id);
+  
+  -- CHECK - используется для наложения логического условия
+  ALTER TABLE book
+  ADD COLUMN price decimal CONSTRAINT CHK_book_price CHECK (price >= 0);
+
+  -- DEFAULT - используется для необязательных полей и при пустой вставке в это поле вставляется стандартное значение
+  CREATE TABLE publisher
+  (
+	publisher_id serial,
+	full_name text,
+	status char DEFAULT 'r',
+	
+	CONSTRAINT pk_publisher_publisher_id PRIMARY KEY(publisher_id),
+	CONSTRAINT CHK_publisher_status CHECK (status = 'r' OR status = 'p')
+  );
+  
+  -- SEQUENCE - Последовательность
+  CREATE SEQUENCE seq1 - Создание полседовательности
+  
+  SELECT nextval('seq1') - Генерация следующего значения в последовательности
+  SELECT currval('seq1') - Возвращает текущее значение
+  SELECT lastval() - Возращает последнее сгенерированное значение какой-либо последовательности в текщей сессии
+  SELECT setval('seq1', 16, true/false) - Установить начальное значение для последовательности 16, и управление счетчиком
+  
+  -- INCREMENT - устанавливает шаг изменения значений
+  CREATE SEQUENCE IF NOT EXISTS seq2 INCREMENT 16;
+  
+  CREATE SEQUENCE IF NOT EXISTS seq3
+  INCREMENT 16
+  MINVALUE 0
+  MAXVALUE 128
+  START WITH 0;
+  
+  ALTER SEQUENCE seq3 RENAME TO seq4;
+  ALTER SEQUENCE seq4 RESTART WITH 16;
+  DROP SEQUENCE seq4;
+  
+  -- serial - это обычный int, но с автоинкрементом
+  
+  -- CREATE SEQUENCE - создать последовательность с именем book_book_id_seq, для столбца book.book_id, начиная с 1
+  
+  CREATE SEQUENCE IF NOT EXISTS book_book_id_seq
+  START WITH 1 OWNED BY book.book_id;
+  
+  -- nextval - используют для того, чтобы была автогенерация и автоинкремент следующего значеия в book_id в таблице book
+  
+  ALTER TABLE book
+  ALTER COLUMN book_id SET DEFAULT nextval('book_book_id_seq');
+  
+  -- GENERATED ALWAYS AS IDENTITY - позволяет не явно указывать id при вставке, id будет автоматически инкрементироваться
+  
+  CREATE TABLE book
+  (
+    book_id int GENERATED ALWAYS AS IDENTITY NOT NULL,
+    title text NOT NULL,
+    isbn varchar(32) NOT NULL,
+    publisher_id int NOT NULL,
+    
+    CONSTRAINT PK_book_book_id PRIMARY KEY(book_id)
+  );
+  
+  CREATE TABLE book
+  (
+    book_id int GENERATED ALWAYS AS IDENTITY (START WITH 10 INCREMENT BY 2) NOT NULL,
+    title text NOT NULL,
+    isbn varchar(32) NOT NULL,
+    publisher_id int NOT NULL,
+    
+    CONSTRAINT PK_book_book_id PRIMARY KEY(book_id)
+  );
+  
+    -- OVERRIDING SYSTEM VALUE - позволяет явно указать id
+
+    INSERT INTO book
+    OVERRIDING SYSTEM VALUE
+    VALUES(3, 'title', 'isbn', 1);
+    
+  -- SELECT, INSERT - также позволяет создавать новые таблицы на основе существующих
+  
+  SELECT *
+  INTO best_authors
+  FROM author
+  WHERE rating >= 4.5;
+  
+  INSERT INTO best_authors
+  SELECT *
+  FROM author
+  WHERE rating < 4.5;
+  
+  -- UPDATE - позволяет изменять записи в таблице
+  
+  UPDATE author
+  SET full_name = 'JACK', rating = 5
+  WHERE author_id = 10;
+  
+  UPDATE author
+  SET full_name = 'JACK', rating = 5; - обновляет все строки в таблице
+  
+  -- DELETE - удаляет строку из таблицы
+  
+  DELETE FROM author
+  WHERE rating < 4.5;
+  
+  DELETE FROM author; - удаляет все строки из таблицы
+  
+  -- RETURNING - поволяет вернуть данные, после команды
+  
+  INSERT INTO book (title, isbn, publisher_id)
+  VALUES ('TITLE', 'ISBN', 3)
+  RETURNING book_id;
