@@ -374,3 +374,199 @@ ORDER BY product_name
   INSERT INTO book (title, isbn, publisher_id)
   VALUES ('TITLE', 'ISBN', 3)
   RETURNING book_id;
+  
+  -- VIEW - Образ таблиц/таблицы, с которым нельзя использовать операторы, кроме WHERE, нельзя добавлять/изменить столбцы
+          - Используется для сокрытия данных таблиц и упрощения использование данных для клиента
+  
+    -- Создание View
+    
+    CEATE VIEW имя_view AS
+    SELECT колонка1, колонка2, и т.д.
+    FROM имя_таблицы
+    WHERE колонка1 > n1;
+    
+    -- Изменение View
+    
+    CREATE OR REPLACE VIEW имя_view AS
+    SELECT колонка1, колонка2, и т.д.
+    FROM имя_таблицы
+    WHERE колонка1 > n2;
+    
+    -- Можно вставить данные во view
+    
+    INSERT INTO имя_view
+    VALUES ('value1', 'value2', ..., 'valueN');
+    
+    -- Нельзя удалить те данные, которые есть в таблице, но нет во VIEW
+    -- Можно удалить те данные, которые есть в таблице и во VIEW
+    
+    -- LOCAL CHECK - Наложение ограничения на вставку значений, согласно фильтру во VIEW
+                   - Используется на уровне текущей VIEW
+      
+    CREATE OR REPLACE VIEW имя_view AS
+    SELECT колонка1, колонка2, и т.д.
+    FROM имя_таблицы
+    WHERE колонка1 > n2
+    WITH LOCAL CHECK OPTION;
+    
+    -- CASCADE CHECK - Исользуется, если VIEW создана на основе др. VIEW
+    
+    CREATE OR REPLACE VIEW имя_view AS
+    SELECT колонка1, колонка2, и т.д.
+    FROM имя_таблицы
+    WHERE колонка1 > n2
+    WITH CASCADE CHECK OPTION;
+    
+    
+  -- Логический операторы
+  
+    -- CASE
+    -- condition - условие, возвращающее bool
+    -- result - результат, если condition true
+    
+    CASE 
+      WHEN condidtion_1 THEN result_1
+      WHEN condidtion_2 THEN result_2
+      WHEN ...
+      ELSE result_n
+    END
+    
+    SELECT product_name, unit_price, units_in_stock
+      CASE WHEN units_in_stock >= 100 THEN 'lots of'
+           WHEN units_in_stock >= 50 AND units_in_stock < 100 THEN 'average'
+           WHEN units_in_stock < 50 THEN 'low number'
+           ELSE 'unknown'
+      END AS amount
+    FROM products
+    ORDER BY units_in_stock DESC;
+    
+    в данном случае amount будет названием столбца с выполненым условием CASE
+ 
+    -- COALESCE(arg1, arg2, ...) - возвращает первый аргумент, который не null. Обычно arg1 передается аргумент, который ожидается что будет null, а вторым аргументом то, на что подменить нулевой аргумент1  
+    -- NULLIF(arg1,arg2) - сравинивает два аргумента, если они равны, то возвращает null. А если не равны, то возвращает аргумент1
+    
+    -- Вернем из таблицы orders столбец ship_region, в котором значения Null подменим на 'unknown'
+    SELECT order_id, order_date, COALESCE(ship_region, 'unknown') AS ship_region
+    FROM orders;
+    
+    SELECT last_name, first_name, COALESCE(region, 'N/A') as region
+    FROM employees;
+    
+    -- заменим пустую строку (не null) в столбце city на 'Unknown'
+    SELECT contact_name, COALASCE(NULLIF(city, ''), 'Unknown') as city
+    FROM customers;
+    
+  
+  -- Функция - Объект БД, принимающий аргументы и возвращающий результат
+             - Компелируема и хранится на стороне БД. Её вызов стоит дёшево
+             - Разгроничивание работы Frontend-dev и Server-side dev
+             - Переиспользование функций разными клиентскими приложениями
+             - Управление безопасностью через регулирование доступа к БД
+             - Модульное программирование
+             
+  -- Функции в Postgres - Состоят из набора утверждений, возвращая результат последнего
+                        - Могут содержать SELECT, INSERT, UPDATE, DELETE
+                        - Не могут содержать COMMIT, SAVEPOINT (TCL), VACUUM (utility)
+                        - Автотранзакционны
+                        - Делятся на 
+                          - SQL-функции
+                          - Процедурные (Pl/pgSQL - основной диалект)
+                          - Серверные функции (написанные на С)
+                          - Собственные С-функции
+
+  -- Создание функции
+    -- $$ тело функции $$
+    
+    CREATE FUNCTION func_name([arg1, arg2, ...]) RETURNS data_type AS $$
+    --logic
+    $$ LANGUAGE lang
+    
+  -- Модификация функции с именем func_name
+  
+    CREATE OR REPLACE func_name...
+    
+    UPDATE customers
+    SET region = 'unknown'
+    WHERE region IS NULL;
+    
+    CREATE OR REPLACE FUNCTION fix_customer_region() RETURNS void AS $$
+        UPDATE customers
+        SET region = 'unknown'
+        WHERE region IS NULL;
+    $$ LANGUAGE SQL;
+    
+    -- Вызов функции (выполнение логики функции)
+    
+    SELECT fix_customer_region();
+    
+  -- Скалярные функции
+  
+    -- Функция для возврата количества всех продуктов
+    CREATE OR REPLACE FUNCTION get_total_number_of_goods() RETURNS bigint AS $$
+        SELECT SUM(units_in_stock)
+        FROM products
+    $$ LANGUAGE SQL;
+    
+    SELECT get_total_number_of_goods() AS total_goods;
+    
+    -- Посчитаем среднюю цену по всем продуктам
+    CREATE OR REPLACE FUNCTION get_total_number_of_goods() RETURNS float8 AS $$
+        SELECT AVG(units_in_stock)
+        FROM products
+    $$ LANGUAGE SQL;
+    
+    -- IN, OUT, DEFAULT
+    
+      -- IN - входящие аргументы (указывается неявно)
+      -- OUT - исходящие аргументы
+      -- INOUT - и входящий и исходящий аргумент
+      -- VARIADIC - массив входящих параметров
+      -- DEFAULT value - присваивание аргументам значение по умолчанию
+      
+    CREATE OR REPLACE FUNCTION get_product_price_by_name(prod_name varchar) RETURNS real AS $$
+        SELECT unit_price
+        FROM products
+        WHERE product_name = prod_name
+    $$ LANGUAGE SQL;
+    
+    SELECT get_product_price_by_name('Chocolade') as price;
+    
+    -- получить наименьшую и наибольшую цену среди всех продуктов:
+    
+    CREATE OR REPLACE FUNCTION get_price_boundaries(OUT max_price real, OUT min_price real) AS $$
+        SELECT MAX(unit_price), MIN(unit_price)
+        FROM products
+    $$ LANGUAGE SQL;
+    
+    -- вернем макимальную и минимальную цены
+    
+    SELECT * FROM get_price_boundaries();
+    
+    -- получить границу цены по discountinute
+    
+    CREATE OR REPLACE FUNCTION get_price_boundaries_by_discontinuity(is_discontinued int, OUT max_price real, OUT min_price real) AS $$
+        SELECT MAX(unit_price), MIN(unit_price)
+        FROM products
+        WHERE discontinued = is_discontinued
+    $$ LANGUAGE SQL;
+    
+    SELECT * FROM get_price_boundaries_by_discontinuity(1);
+    
+    -- пример с DEFAULT 
+    
+    CREATE OR REPLACE FUNCTION get_price_boundaries_by_discontinuity(is_discontinued int DEFAULT 1, OUT max_price real, OUT min_price real) AS $$
+        SELECT MAX(unit_price), MIN(unit_price)
+        FROM products
+        WHERE discontinued = is_discontinued
+    $$ LANGUAGE SQL;
+    
+    SELECT * FROM get_price_boundaries_by_discontinuity(1);
+    SELECT * FROM get_price_boundaries_by_discontinuity();
+    
+    -- Возврат множества строк
+      
+      -- RETURNS SETOF data_type - возврат n-значений типа data_type
+      -- RETURNS SETOF table - возврат всех столбцов из таблицы или пользовательского типа
+      -- RETURNS SETOF record - когда типы колонок в результирующем наборе заранее неизвестны
+      -- RETURNS TABLE(column_name data_type, ...) - анологичен SETOF table, но есть возможность явно указать возвращаемыу столбцы
+      
